@@ -13,8 +13,7 @@ robot_type: aloha
 # Specific to Aloha, LeRobot comes with default calibration files. Assuming the motors have been
 # properly assembled, no manual calibration step is expected. If you need to run manual calibration,
 # simply update this path to ".cache/calibration/aloha"
-# calibration_dir: .cache/calibration/aloha_default
-calibration_dir: .cache/calibration/aloha_solo
+calibration_dir: lerobot/.cache/calibration/aloha_solo
 
 # /!\ FOR SAFETY, READ THIS /!\
 # `max_relative_target` limits the magnitude of the relative positional target vector for safety purposes.
@@ -26,7 +25,7 @@ calibration_dir: .cache/calibration/aloha_solo
 # Also, everything is expected to work safely out-of-the-box, but we highly advise to
 # first try to teleoperate the grippers only (by commenting out the rest of the motors in this yaml),
 # then to gradually add more motors (by uncommenting), until you can teleoperate both arms fully
-max_relative_target: 5
+# max_relative_target: 5
 
 leader_arms:
   main:
