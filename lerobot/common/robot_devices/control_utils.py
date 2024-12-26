@@ -1,6 +1,7 @@
 ########################################################################################
 # Utilities
 ########################################################################################
+from flask_socketio import SocketIO
 
 
 import logging
@@ -236,6 +237,7 @@ def control_loop(
     device=None,
     use_amp=None,
     fps=None,
+    socketio=None,
 ):
     # TODO(rcadene): Add option to record logs
     if not robot.is_connected:
@@ -285,6 +287,8 @@ def control_loop(
             busy_wait(1 / fps - dt_s)
 
         dt_s = time.perf_counter() - start_loop_t
+        if socketio:
+            socketio.emit('dt_update', {'dt': dt_s, 'hz': 1/dt_s})
         log_control_info(robot, dt_s, fps=fps)
 
         timestamp = time.perf_counter() - start_episode_t
