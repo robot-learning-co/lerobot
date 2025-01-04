@@ -2,6 +2,7 @@
 # Utilities
 ########################################################################################
 from flask_socketio import SocketIO
+import base64
 
 
 import logging
@@ -276,19 +277,36 @@ def control_loop(
             frame = {**observation, **action}
             dataset.add_frame(frame)
 
-        if display_cameras and not is_headless():
+        # if display_cameras and not is_headless():
+        #     image_keys = [key for key in observation if "image" in key]
+        #     for key in image_keys:
+        #         cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
+        #     cv2.waitKey(1)
+        
+        ### TRLC ### 
+        if socketio and display_cameras:
             image_keys = [key for key in observation if "image" in key]
             for key in image_keys:
-                cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
-            cv2.waitKey(1)
+                encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), 25]
+                img_bgr = cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR)
+                img_bgr_small = cv2.resize(img_bgr, (320, 240))
+                _, buffer = cv2.imencode(".jpg", img_bgr_small, encode_params)
+                jpg_as_text = base64.b64encode(buffer).decode("utf-8")
+                socket_name = key.split('.')[-1]
+                socketio.emit(socket_name, jpg_as_text) # observation.images.cam_shoulder -> cam_shoulder
+                # print('Sent new image from ', socket_name)
+            # cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
+        ############
 
         if fps is not None:
             dt_s = time.perf_counter() - start_loop_t
             busy_wait(1 / fps - dt_s)
 
         dt_s = time.perf_counter() - start_loop_t
+        ### TRLC ###
         if socketio:
             socketio.emit('dt_update', {'dt': dt_s, 'hz': 1/dt_s})
+        ############
         log_control_info(robot, dt_s, fps=fps)
 
         timestamp = time.perf_counter() - start_episode_t
