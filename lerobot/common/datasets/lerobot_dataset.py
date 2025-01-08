@@ -76,7 +76,7 @@ class LeRobotDatasetMetadata:
         self,
         repo_id: str,
         root: str | Path | None = None,
-        local_files_only: bool = False,
+        local_files_only: bool = True,
     ):
         self.repo_id = repo_id
         self.root = Path(root) if root is not None else LEROBOT_HOME / repo_id
@@ -325,7 +325,7 @@ class LeRobotDataset(torch.utils.data.Dataset):
         delta_timestamps: dict[list[float]] | None = None,
         tolerance_s: float = 1e-4,
         download_videos: bool = True,
-        local_files_only: bool = False,
+        local_files_only: bool = True,
         video_backend: str | None = None,
     ):
         """
@@ -975,7 +975,7 @@ class MultiLeRobotDataset(torch.utils.data.Dataset):
         delta_timestamps: dict[list[float]] | None = None,
         tolerances_s: dict | None = None,
         download_videos: bool = True,
-        local_files_only: bool = False,
+        local_files_only: bool = True,
         video_backend: str | None = None,
     ):
         super().__init__()
