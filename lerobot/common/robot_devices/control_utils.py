@@ -28,7 +28,7 @@ from lerobot.common.utils.utils import get_safe_torch_device, init_hydra_config,
 from lerobot.scripts.eval import get_pretrained_policy_path
 
 
-def log_control_info(robot: Robot, dt_s, episode_index=None, frame_index=None, fps=None):
+def log_control_info(robot: Robot, dt_s, episode_index=None, frame_index=None, fps=None, socketio=None):
     log_items = []
     if episode_index is not None:
         log_items.append(f"ep:{episode_index}")
@@ -70,6 +70,9 @@ def log_control_info(robot: Robot, dt_s, episode_index=None, frame_index=None, f
 
     info_str = " ".join(log_items)
     logging.info(info_str)
+
+    if socketio:
+        socketio.emit("control_info", info_str)
 
 
 @cache
@@ -211,6 +214,7 @@ def record_episode(
     device,
     use_amp,
     fps,
+    socketio,
 ):
     control_loop(
         robot=robot,
@@ -223,6 +227,7 @@ def record_episode(
         use_amp=use_amp,
         fps=fps,
         teleoperate=policy is None,
+        socketio=socketio,
     )
 
 
@@ -307,12 +312,13 @@ def control_loop(
         if socketio:
             socketio.emit('dt_update', {'dt': dt_s, 'hz': 1/dt_s})
         ############
-        log_control_info(robot, dt_s, fps=fps)
+        log_control_info(robot, dt_s, fps=fps, socketio=socketio)
 
         timestamp = time.perf_counter() - start_episode_t
         if events["exit_early"]:
             events["exit_early"] = False
             break
+        
 
 
 def reset_environment(robot, events, reset_time_s):
