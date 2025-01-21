@@ -69,7 +69,7 @@ from lerobot.common.robot_devices.robots.utils import Robot
 # For maintainers, see lerobot/common/datasets/push_dataset_to_hub/CODEBASE_VERSION.md
 CODEBASE_VERSION = "v2.0"
 # LEROBOT_HOME = Path(os.getenv("LEROBOT_HOME", "~/.cache/huggingface/lerobot")).expanduser()
-TRLC_HOME = Path(os.getenv("TRLC_HOME", "~/.cache/trlc/datasets")).expanduser()
+TRLC_HOME = Path(os.getenv("TRLC_HOME", "~/repos/datasets")).expanduser()
 
 
 class LeRobotDatasetMetadata:
@@ -815,7 +815,15 @@ class LeRobotDataset(torch.utils.data.Dataset):
                     episode_index=episode_index, image_key=cam_key, frame_index=0
                 ).parent
                 if img_dir.is_dir():
-                    shutil.rmtree(img_dir)
+                    ###TRLC###
+                    for item in img_dir.iterdir():
+                        if item.is_dir():
+                            shutil.rmtree(item)  # Remove subdirectory
+                        else:
+                            item.unlink()  # Remove file
+                    img_dir.rmdir()
+                    ###TRLC###
+                    # shutil.rmtree(img_dir)
 
         # Reset the buffer
         self.episode_buffer = self.create_episode_buffer()
