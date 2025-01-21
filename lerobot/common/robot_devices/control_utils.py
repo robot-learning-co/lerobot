@@ -214,7 +214,7 @@ def record_episode(
     device,
     use_amp,
     fps,
-    socketio,
+    socketio=None,
 ):
     control_loop(
         robot=robot,
@@ -273,6 +273,7 @@ def control_loop(
 
             if policy is not None:
                 pred_action = predict_action(observation, policy, device, use_amp)
+                # print(pred_action)
                 # Action can eventually be clipped using `max_relative_target`,
                 # so action actually sent is saved in the dataset.
                 action = robot.send_action(pred_action)
@@ -309,10 +310,10 @@ def control_loop(
 
         dt_s = time.perf_counter() - start_loop_t
         ### TRLC ###
-        if socketio:
-            socketio.emit('dt_update', {'dt': dt_s, 'hz': 1/dt_s})
+        # if socketio:
+        #     socketio.emit('dt_update', {'dt': dt_s, 'hz': 1/dt_s})
         ############
-        log_control_info(robot, dt_s, fps=fps, socketio=socketio)
+        log_control_info(robot, dt_s, fps=fps, socketio=None)
 
         timestamp = time.perf_counter() - start_episode_t
         if events["exit_early"]:
