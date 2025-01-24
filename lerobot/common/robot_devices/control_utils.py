@@ -1,6 +1,8 @@
 ########################################################################################
 # Utilities
 ########################################################################################
+from flask_socketio import SocketIO
+import base64
 
 
 import logging
@@ -26,7 +28,7 @@ from lerobot.common.utils.utils import get_safe_torch_device, init_hydra_config,
 from lerobot.scripts.eval import get_pretrained_policy_path
 
 
-def log_control_info(robot: Robot, dt_s, episode_index=None, frame_index=None, fps=None):
+def log_control_info(robot: Robot, dt_s, episode_index=None, frame_index=None, fps=None, socketio=None):
     log_items = []
     if episode_index is not None:
         log_items.append(f"ep:{episode_index}")
@@ -68,6 +70,9 @@ def log_control_info(robot: Robot, dt_s, episode_index=None, frame_index=None, f
 
     info_str = " ".join(log_items)
     logging.info(info_str)
+
+    if socketio:
+        socketio.emit("control_info", info_str)
 
 
 @cache
@@ -209,6 +214,7 @@ def record_episode(
     device,
     use_amp,
     fps,
+    socketio=None,
 ):
     control_loop(
         robot=robot,
@@ -221,6 +227,7 @@ def record_episode(
         use_amp=use_amp,
         fps=fps,
         teleoperate=policy is None,
+        socketio=socketio,
     )
 
 
@@ -236,6 +243,7 @@ def control_loop(
     device=None,
     use_amp=None,
     fps=None,
+    socketio=None,
 ):
     # TODO(rcadene): Add option to record logs
     if not robot.is_connected:
@@ -265,6 +273,7 @@ def control_loop(
 
             if policy is not None:
                 pred_action = predict_action(observation, policy, device, use_amp)
+                # print(pred_action)
                 # Action can eventually be clipped using `max_relative_target`,
                 # so action actually sent is saved in the dataset.
                 action = robot.send_action(pred_action)
@@ -274,23 +283,43 @@ def control_loop(
             frame = {**observation, **action}
             dataset.add_frame(frame)
 
-        if display_cameras and not is_headless():
+        # if display_cameras and not is_headless():
+        #     image_keys = [key for key in observation if "image" in key]
+        #     for key in image_keys:
+        #         cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
+        #     cv2.waitKey(1)
+        
+        ### TRLC ### 
+        if socketio and display_cameras:
             image_keys = [key for key in observation if "image" in key]
             for key in image_keys:
-                cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
-            cv2.waitKey(1)
+                encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), 25]
+                img_bgr = cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR)
+                img_bgr_small = cv2.resize(img_bgr, (320, 240))
+                _, buffer = cv2.imencode(".jpg", img_bgr_small, encode_params)
+                jpg_as_text = base64.b64encode(buffer).decode("utf-8")
+                socket_name = key.split('.')[-1]
+                socketio.emit(socket_name, jpg_as_text) # observation.images.cam_shoulder -> cam_shoulder
+                # print('Sent new image from ', socket_name)
+            # cv2.imshow(key, cv2.cvtColor(observation[key].numpy(), cv2.COLOR_RGB2BGR))
+        ############
 
         if fps is not None:
             dt_s = time.perf_counter() - start_loop_t
             busy_wait(1 / fps - dt_s)
 
         dt_s = time.perf_counter() - start_loop_t
-        log_control_info(robot, dt_s, fps=fps)
+        ### TRLC ###
+        # if socketio:
+        #     socketio.emit('dt_update', {'dt': dt_s, 'hz': 1/dt_s})
+        ############
+        log_control_info(robot, dt_s, fps=fps, socketio=None)
 
         timestamp = time.perf_counter() - start_episode_t
         if events["exit_early"]:
             events["exit_early"] = False
             break
+        
 
 
 def reset_environment(robot, events, reset_time_s):

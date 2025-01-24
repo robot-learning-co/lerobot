@@ -406,7 +406,7 @@ def main():
     parser.add_argument(
         "--local-files-only",
         type=int,
-        default=0,
+        default=1,
         help="Use local files only. By default, this script will try to fetch the dataset from the hub if it exists.",
     )
     parser.add_argument(
