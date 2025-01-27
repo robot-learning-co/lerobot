@@ -443,7 +443,7 @@ def main():
     parser.add_argument(
         "--host",
         type=str,
-        default="127.0.0.1",
+        default="0.0.0.0",
         help="Web host used by the http server.",
     )
     parser.add_argument(
