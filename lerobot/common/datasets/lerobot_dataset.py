@@ -69,7 +69,7 @@ from lerobot.common.robot_devices.robots.utils import Robot
 # For maintainers, see lerobot/common/datasets/push_dataset_to_hub/CODEBASE_VERSION.md
 CODEBASE_VERSION = "v2.0"
 # LEROBOT_HOME = Path(os.getenv("LEROBOT_HOME", "~/.cache/huggingface/lerobot")).expanduser()
-TRLC_HOME = Path(os.getenv("TRLC_HOME", "~/repos/datasets")).expanduser()
+TRLC_HOME = Path(os.getenv("TRLC_HOME", "~/trlc/datasets")).expanduser()
 
 
 class LeRobotDatasetMetadata:
