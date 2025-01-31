@@ -322,7 +322,7 @@ def control_loop(
         
 
 
-def reset_environment(robot, events, reset_time_s):
+def reset_environment(robot, events, reset_time_s, fps):
     # TODO(rcadene): refactor warmup_record and reset_environment
     # TODO(alibets): allow for teleop during reset
     if has_method(robot, "teleop_safety_stop"):
@@ -331,15 +331,22 @@ def reset_environment(robot, events, reset_time_s):
     timestamp = 0
     start_vencod_t = time.perf_counter()
 
-    # Wait if necessary
-    with tqdm.tqdm(total=reset_time_s, desc="Waiting") as pbar:
-        while timestamp < reset_time_s:
-            time.sleep(1)
-            timestamp = time.perf_counter() - start_vencod_t
-            pbar.update(1)
-            if events["exit_early"]:
-                events["exit_early"] = False
-                break
+    control_loop(
+        robot=robot,
+        control_time_s=reset_time_s,
+        events=events,
+        fps=fps,
+        teleoperate=True,
+    )
+    # # Wait if necessary
+    # with tqdm.tqdm(total=reset_time_s, desc="Waiting") as pbar:
+    #     while timestamp < reset_time_s:
+    #         time.sleep(1)
+    #         timestamp = time.perf_counter() - start_vencod_t
+    #         pbar.update(1)
+    #         if events["exit_early"]:
+    #             events["exit_early"] = False
+    #             break
 
 
 def stop_recording(robot, listener, display_cameras):
