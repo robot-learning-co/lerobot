@@ -454,14 +454,15 @@ class IntelRealSenseCamera:
             if self.rotation is not None:
                 depth_map = cv2.rotate(depth_map, self.rotation)
 
-            return color_image, depth_map
+            return color_image# , depth_map
         else:
             return color_image
 
     def read_loop(self):
         while not self.stop_event.is_set():
             if self.use_depth:
-                self.color_image, self.depth_map = self.read()
+                self.color_image = self.read()
+                # self.color_image, self.depth_map = self.read()
             else:
                 self.color_image = self.read()
 
@@ -489,7 +490,7 @@ class IntelRealSenseCamera:
                 )
 
         if self.use_depth:
-            return self.color_image, self.depth_map
+            return self.color_image#, self.depth_map
         else:
             return self.color_image
 
