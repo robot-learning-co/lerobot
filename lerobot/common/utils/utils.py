@@ -43,21 +43,20 @@ def inside_slurm():
 
 def get_safe_torch_device(cfg_device: str, log: bool = False) -> torch.device:
     """Given a string, return a torch.device with checks on whether the device is available."""
-    match cfg_device:
-        case "cuda":
-            assert torch.cuda.is_available()
-            device = torch.device("cuda")
-        case "mps":
-            assert torch.backends.mps.is_available()
-            device = torch.device("mps")
-        case "cpu":
-            device = torch.device("cpu")
-            if log:
-                logging.warning("Using CPU, this will be slow.")
-        case _:
-            device = torch.device(cfg_device)
-            if log:
-                logging.warning(f"Using custom {cfg_device} device.")
+    if cfg_device.startswith("cuda"):
+        assert torch.cuda.is_available()
+        device = torch.device(cfg_device)
+    elif cfg_device == "mps":
+        assert torch.backends.mps.is_available()
+        device = torch.device(cfg_device)
+    elif cfg_device == "cpu":
+        device = torch.device(cfg_device)
+        if log:
+            logging.warning("Using CPU, this will be slow.")
+    else:
+        device = torch.device(cfg_device)
+        if log:
+            logging.warning(f"Using custom {cfg_device} device.")
 
     return device
 
