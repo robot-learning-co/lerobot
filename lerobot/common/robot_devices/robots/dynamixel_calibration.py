@@ -17,6 +17,7 @@ URL_TEMPLATE = (
 # The following positions are provided in nominal degree range ]-180, +180[
 # For more info on these constants, see comments in the code where they get used.
 ZERO_POSITION_DEGREE = 0
+MOUNTED_POSITION_DEGREE = 45
 ROTATED_POSITION_DEGREE = 90
 
 
@@ -36,7 +37,7 @@ def apply_drive_mode(position, drive_mode):
 
 
 def compute_nearest_rounded_position(position, models):
-    delta_turn = convert_degrees_to_steps(ROTATED_POSITION_DEGREE, models)
+    delta_turn = convert_degrees_to_steps(MOUNTED_POSITION_DEGREE, models)
     nearest_pos = np.round(position.astype(float) / delta_turn) * delta_turn
     return nearest_pos.astype(position.dtype)
 
