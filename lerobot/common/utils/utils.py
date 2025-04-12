@@ -62,14 +62,14 @@ def get_safe_torch_device(try_device: str, log: bool = False) -> torch.device:
         case "mps":
             assert torch.backends.mps.is_available()
             device = torch.device("mps")
-        else:
-            raise ValueError("MPS is not available.")
-    elif try_device == "cpu":
-        device = torch.device("cpu")
-        if log:
-            logging.warning("Using CPU, this will be slow.")
-    else:
-        raise ValueError(f"Unknown device '{try_device}.")
+        case "cpu":
+            device = torch.device("cpu")
+            if log:
+                logging.warning("Using CPU, this will be slow.")
+        case _:
+            device = torch.device(try_device)
+            if log:
+                logging.warning(f"Using custom {try_device} device.")
 
     return device
 
