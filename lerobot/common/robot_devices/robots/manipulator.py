@@ -227,7 +227,7 @@ class ManipulatorRobot:
             print(f"Connecting {name} leader arm.")
             self.leader_arms[name].connect()
 
-        if self.robot_type in ["koch", "koch_bimanual", "aloha"]:
+        if self.robot_type in ["koch", "koch_bimanual", "aloha", "trlc_dynamixel"]:
             from lerobot.common.robot_devices.motors.dynamixel import TorqueMode
         elif self.robot_type in ["so100", "moss", "trlc_so100"]:
             from lerobot.common.robot_devices.motors.feetech import TorqueMode
@@ -294,7 +294,7 @@ class ManipulatorRobot:
                 # TODO(rcadene): display a warning in __init__ if calibration file not available
                 print(f"Missing calibration file '{arm_calib_path}'")
 
-                if self.robot_type in ["koch", "koch_bimanual", "aloha"]:
+                if self.robot_type in ["koch", "koch_bimanual", "aloha", "trlc_dynamixel"]:
                     from lerobot.common.robot_devices.robots.dynamixel_calibration import run_arm_calibration
 
                     calibration = run_arm_calibration(arm, self.robot_type, name, arm_type)
