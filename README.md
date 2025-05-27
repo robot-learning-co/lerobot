@@ -1,3 +1,25 @@
+# TRLC's Fork of LeRobot
+## ARX R5 Setup
+Follow [ARX Robotic's instructions](https://github.com/ARXroboticsX/R5/tree/master) to setup the arms.
+You need to:
+1. Clone R5 repo to home dir
+2. Setup CAN (install drivers, search for ports, set and apply CAN rules)
+3. Run CAN interface for every arm
+4. Build the code (see [01-python-R5-SDK.pdf](https://github.com/ARXroboticsX/R5/blob/0620037dca100115e30b09ba55a45d43ae20bb0b/00-readme/01-python-%E5%8D%95%E8%87%82R5-SDK.pdf))
+5. If you're not using ROS you need to install kdl_parser for low-level kinematics (and dependencies). Follow [KDL.pdf](https://github.com/ARXroboticsX/R5/blob/0620037dca100115e30b09ba55a45d43ae20bb0b/00-readme/KDL%E5%BA%93%E5%AE%89%E8%A3%85%20.pdf) and install this:
+```
+sudo apt-get update
+sudo apt-get install -y liburdfdom-dev liburdfdom-headers-dev libconsole-bridge-dev libtinyxml2-dev          
+```
+6. When the build needs Eigen 3.4.0
+```
+git clone https://gitlab.com/libeigen/eigen.git
+export EIGEN3_ROOT_DIR=/home/ubuntu/eigen
+```
+7. Source `arx_env.sh` before running LeRobot's control scripts so the driver directory is in Python's path
+
+
+# Original README.md
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="media/lerobot-logo-thumbnail.png">

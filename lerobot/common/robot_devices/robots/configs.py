@@ -674,3 +674,36 @@ class LeKiwiRobotConfig(RobotConfig):
     )
 
     mock: bool = False
+
+@RobotConfig.register_subclass("arx")
+@dataclass
+class ARXRobotConfig(RobotConfig):
+    leader_arms = {
+        "main": {
+            "can_port": "can1",
+            "type": 0,
+        }
+    }
+    follower_arms = {
+        "main": {
+            "can_port": "can2",
+            "type": 0,
+        }
+    }
+    
+    cameras: dict[str, CameraConfig] = field(
+        default_factory=lambda: {
+            "cam_wrist": IntelRealSenseCameraConfig(
+                serial_number=218622271287,
+                fps=30,
+                width=640,
+                height=480,
+            ),
+            "cam_head": IntelRealSenseCameraConfig(
+                serial_number=344322074255,
+                fps=30,
+                width=640,
+                height=480,
+            ),
+        }
+    )
