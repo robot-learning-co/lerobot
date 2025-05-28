@@ -678,12 +678,37 @@ class LeKiwiRobotConfig(RobotConfig):
 @RobotConfig.register_subclass("arx")
 @dataclass
 class ARXRobotConfig(RobotConfig):
-    leader_arms = {
-        "main": {
-            "can_port": "can2",
-            "type": 0,
+    calibration_dir: str = ".cache/calibration/arx"
+    # `max_relative_target` limits the magnitude of the relative positional target vector for safety purposes.
+    # Set this to a positive scalar to have the same value for all motors, or a list that is the same length as
+    # the number of motors in your follower arms.
+    max_relative_target: int | None = 10
+    
+    leader_gripper_open_degree: float = 68.0 #deg
+    leader_gripper_close_degree: float = 133.0 #deg
+    follower_gripper_open_rad: float = 5.2 #rad
+    follower_gripper_close_rad: float = 0.0 #rad
+    
+    
+
+    leader_arms: dict[str, MotorsBusConfig] = field(
+        default_factory=lambda: {
+            "main": DynamixelMotorsBusConfig(
+                port="/dev/ttyACM0",
+                motors={
+                    # name: (index, model)
+                    "joint1": [1, "xl330-m077"],
+                    "joint2": [2, "xl330-m077"],
+                    "joint3": [3, "xl330-m077"],
+                    "joint4": [4, "xl330-m077"],
+                    "joint5": [5, "xl330-m077"],
+                    "joint6": [6, "xl330-m077"],
+                    "gripper": [7, "xl330-m077"],
+                },
+            ),
         }
-    }
+    )
+    
     follower_arms = {
         "main": {
             "can_port": "can1",

@@ -16,6 +16,32 @@ from lerobot.common.robot_devices.robots.utils import get_arm_id
 from lerobot.common.robot_devices.utils import RobotDeviceAlreadyConnectedError, RobotDeviceNotConnectedError
 
 from bimanual import SingleArm
+from scipy.interpolate import interp1d
+
+def ensure_safe_goal_position(
+    goal_pos: torch.Tensor, present_pos: torch.Tensor, max_relative_target: float | list[float]
+):
+    # Cap relative action target magnitude for safety.
+    diff = goal_pos - present_pos
+    max_relative_target = torch.tensor(max_relative_target)
+    safe_diff = torch.minimum(diff, max_relative_target)
+    safe_diff = torch.maximum(safe_diff, -max_relative_target)
+    safe_goal_pos = present_pos + safe_diff
+
+    # if not torch.allclose(goal_pos, safe_goal_pos):
+    #     logging.warning(
+    #         "Relative goal position magnitude had to be clamped to be safe.\n"
+    #         f"  requested relative goal position target: {diff}\n"
+    #         f"    clamped relative goal position target: {safe_diff}"
+    #     )
+
+    return safe_goal_pos
+
+def map_range(x, src_min, src_max, dst_min, dst_max):
+    # position of x inside the source range, as a fraction 0–1
+    t = (x - src_min) / (src_max - src_min)
+    # stretch and shift that fraction into the target range
+    return t * (dst_max - dst_min) + dst_min
 
 class ARXRobot:
     def __init__(
@@ -24,10 +50,11 @@ class ARXRobot:
     ):
         self.config = config
         self.robot_type = self.config.type
+        self.calibration_dir = Path(self.config.calibration_dir)
+        self.leader_arms = make_motors_buses_from_configs(self.config.leader_arms)
         self.cameras = make_cameras_from_configs(self.config.cameras)
         self.is_connected = False
         self.logs = {}
-        self.leader_arms = {}
         self.follower_arms = {}
 
     @property
@@ -86,22 +113,74 @@ class ARXRobot:
                 "ManipulatorRobot is already connected. Do not run `robot.connect()` twice."
             )
             
-        for name in self.config.leader_arms:
-            leader_config = self.config.leader_arms[name]
-            self.leader_arms[name] = SingleArm(leader_config)
+    
+        for name in self.leader_arms:
+            print(f"Connecting {name} leader arm.")
+            self.leader_arms[name].connect()
+        
+        from lerobot.common.robot_devices.motors.dynamixel import TorqueMode
+        for name in self.leader_arms:
+            self.leader_arms[name].write("Torque_Enable", TorqueMode.DISABLED.value)
             
+        self.activate_calibration()
+        
+
+        if self.config.leader_gripper_open_degree is not None:
+            # Set the leader arm in torque mode with the gripper motor set to an angle. This makes it possible
+            # to squeeze the gripper and have it spring back to an open position on its own.
+            for name in self.leader_arms:
+                self.leader_arms[name].write("Torque_Enable", 1, "gripper")
+                self.leader_arms[name].write("Goal_Position", self.config.leader_gripper_open_degree, "gripper")
+        
+        # ARX Follower
         for name in self.config.follower_arms:
             follower_config = self.config.follower_arms[name]
             self.follower_arms[name] = SingleArm(follower_config)
-
-        for name in self.leader_arms:
-            self.leader_arms[name].gravity_compensation()
+        
+        # for name in self.config.leader_arms:
+        #     leader_config = self.config.leader_arms[name]
+        #     self.leader_arms[name] = SingleArm(leader_config)
+        # for name in self.leader_arms:
+        #     self.leader_arms[name].gravity_compensation()
+        
         
         for name in self.cameras:
             self.cameras[name].connect()
 
         self.is_connected = True
+        
+    
+    def activate_calibration(self):
+        """After calibration all motors function in human interpretable ranges.
+        Rotations are expressed in degrees in nominal range of [-180, 180],
+        and linear motions (like gripper of Aloha) in nominal range of [0, 100].
+        """
 
+        def load_or_run_calibration_(name, arm, arm_type):
+            arm_id = get_arm_id(name, arm_type)
+            arm_calib_path = self.calibration_dir / f"{arm_id}.json"
+
+            if arm_calib_path.exists():
+                with open(arm_calib_path) as f:
+                    calibration = json.load(f)
+            else:
+                print(f"Missing calibration file '{arm_calib_path}'")
+
+                from lerobot.common.robot_devices.robots.dynamixel_calibration import run_arm_calibration
+                calibration = run_arm_calibration(arm, self.robot_type, name, arm_type)
+
+                print(f"Calibration is done! Saving calibration file '{arm_calib_path}'")
+                arm_calib_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(arm_calib_path, "w") as f:
+                    json.dump(calibration, f)
+
+            return calibration
+
+        for name, arm in self.leader_arms.items():
+            calibration = load_or_run_calibration_(name, arm, "leader")
+            arm.set_calibration(calibration)
+        
+        
     def teleop_step(
         self, record_data=False
     ) -> None | tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
@@ -114,7 +193,7 @@ class ARXRobot:
         leader_pos = {}
         for name in self.leader_arms:
             before_lread_t = time.perf_counter()
-            leader_pos[name] = self.leader_arms[name].get_joint_positions()
+            leader_pos[name] = self.leader_arms[name].read("Present_Position")
             leader_pos[name] = torch.from_numpy(np.array(leader_pos[name], dtype=np.float32))
             self.logs[f"read_leader_{name}_pos_dt_s"] = time.perf_counter() - before_lread_t
 
@@ -125,10 +204,29 @@ class ARXRobot:
             goal_pos = leader_pos[name]
 
             follower_goal_pos[name] = goal_pos
-            goal_pos = goal_pos.numpy().astype(np.float32)
+            goal_pos = torch.from_numpy(goal_pos.numpy().astype(np.float32))
+            
+            if self.config.max_relative_target is not None:
+                present_pos = np.rad2deg(self.follower_arms[name].get_joint_positions())
+                present_pos = torch.from_numpy(present_pos).to(goal_pos.dtype)
+                goal_pos[:6] = ensure_safe_goal_position(goal_pos[:6], present_pos[:6], self.config.max_relative_target)
         
-            self.follower_arms[name].set_joint_positions(goal_pos[:6])
-            self.follower_arms[name].set_catch_pos(goal_pos[6])    
+            self.follower_arms[name].set_joint_positions(np.deg2rad(np.array(goal_pos[:6], dtype=np.float32)))
+            
+            
+            interp_func = interp1d(
+                [self.config.leader_gripper_open_degree, self.config.leader_gripper_close_degree],
+                [self.config.follower_gripper_open_rad, self.config.follower_gripper_close_rad]
+            )
+            try:
+                gripper_pos = interp_func(goal_pos[6])
+            except ValueError:
+                print("VALUE ERROR GRIPPER POS", goal_pos[6])
+            
+            
+            self.follower_arms[name].set_catch_pos(np.array(gripper_pos, dtype=np.float32))   
+            #print("GRIPPER POS", gripper_pos)             
+            
             self.logs[f"write_follower_{name}_goal_pos_dt_s"] = time.perf_counter() - before_fwrite_t
 
         # Early exit when recording data is not requested
@@ -139,7 +237,7 @@ class ARXRobot:
         follower_pos = {}
         for name in self.follower_arms:
             before_fread_t = time.perf_counter()
-            follower_pos[name] = self.follower_arms[name].get_joint_positions()
+            follower_pos[name] = np.rad2deg(self.follower_arms[name].get_joint_positions())
             follower_pos[name] = torch.from_numpy(np.array(follower_pos[name], dtype=np.float32))
             self.logs[f"read_follower_{name}_pos_dt_s"] = time.perf_counter() - before_fread_t
 
@@ -186,7 +284,7 @@ class ARXRobot:
         follower_pos = {}
         for name in self.follower_arms:
             before_fread_t = time.perf_counter()
-            follower_pos[name] = self.follower_arms[name].get_joint_positions()
+            follower_pos[name] = np.rad2deg(self.follower_arms[name].get_joint_positions())
             follower_pos[name] = torch.from_numpy(np.array(follower_pos[name], dtype=np.float32))
             self.logs[f"read_follower_{name}_pos_dt_s"] = time.perf_counter() - before_fread_t
 
@@ -228,24 +326,25 @@ class ARXRobot:
                 "ManipulatorRobot is not connected. You need to run `robot.connect()`."
             )
 
-        from_idx = 0
-        to_idx = 0
-        action_sent = []
+        # from_idx = 0
+        # to_idx = 0
+        # action_sent = []
         for name in self.follower_arms:
             # Get goal position of each follower arm by splitting the action vector
-            to_idx += len(self.follower_arms[name].motor_names)
-            goal_pos = action[from_idx:to_idx]
-            from_idx = to_idx
+            # to_idx += len(self.follower_arms[name].motor_names)
+            goal_pos = action
+            # from_idx = to_idx
 
             # Save tensor to concat and return
-            action_sent.append(goal_pos)
 
             # Send goal position to each follower
             goal_pos = goal_pos.numpy().astype(np.float32)
-            self.follower_arms[name].set_joint_positions(goal_pos[:6])
-            self.follower_arms[name].set_catch_pos(goal_pos[6])
+            # self.follower_arms[name].set_joint_positions(goal_pos[:6])
+            # self.follower_arms[name].set_catch_pos(goal_pos[6])
+            action_sent=goal_pos
+            
 
-        return torch.cat(action_sent)
+        return action_sent
 
 
     def disconnect(self):
