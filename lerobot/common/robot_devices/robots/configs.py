@@ -680,13 +680,13 @@ class LeKiwiRobotConfig(RobotConfig):
 class ARXRobotConfig(RobotConfig):
     leader_arms = {
         "main": {
-            "can_port": "can1",
+            "can_port": "can2",
             "type": 0,
         }
     }
     follower_arms = {
         "main": {
-            "can_port": "can2",
+            "can_port": "can1",
             "type": 0,
         }
     }

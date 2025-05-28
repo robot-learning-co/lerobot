@@ -17,7 +17,6 @@ from lerobot.common.robot_devices.utils import RobotDeviceAlreadyConnectedError,
 
 from bimanual import SingleArm
 
-
 class ARXRobot:
     def __init__(
         self,
