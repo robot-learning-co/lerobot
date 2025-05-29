@@ -685,7 +685,7 @@ class ARXRobotConfig(RobotConfig):
     max_relative_target: int | None = 10
     
     leader_gripper_open_degree: float = 68.0 #deg
-    leader_gripper_close_degree: float = 133.0 #deg
+    leader_gripper_close_degree: float = 120.0 #deg
     follower_gripper_open_rad: float = 5.2 #rad
     follower_gripper_close_rad: float = 0.0 #rad
     
@@ -725,7 +725,8 @@ class ARXRobotConfig(RobotConfig):
                 height=480,
             ),
             "cam_head": IntelRealSenseCameraConfig(
-                serial_number=344322074255,
+                # serial_number=344322074255,
+                serial_number=130322271806,
                 fps=30,
                 width=640,
                 height=480,
