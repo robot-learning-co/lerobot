@@ -129,6 +129,11 @@ class ARXRobot:
             # Set the leader arm in torque mode with the gripper motor set to an angle. This makes it possible
             # to squeeze the gripper and have it spring back to an open position on its own.
             for name in self.leader_arms:
+                self.leader_arms[name].write("Torque_Enable", 0, "gripper")  
+                self.leader_arms[name].write("Operating_Mode", 5, "gripper") # 1️⃣ OFF
+                self.leader_arms[name].write("Current_Limit",  100, "gripper")
+                # self.leader_arms[name].write("Velocity_Limit",  20,   "gripper")
+                # self.leader_arms[name].write("Profile_Velocity", 20,  "gripper")
                 self.leader_arms[name].write("Torque_Enable", 1, "gripper")
                 self.leader_arms[name].write("Goal_Position", self.config.leader_gripper_open_degree, "gripper")
         
@@ -213,15 +218,13 @@ class ARXRobot:
         
             self.follower_arms[name].set_joint_positions(np.deg2rad(np.array(goal_pos[:6], dtype=np.float32)))
             
-            
-            interp_func = interp1d(
-                [self.config.leader_gripper_open_degree, self.config.leader_gripper_close_degree],
-                [self.config.follower_gripper_open_rad, self.config.follower_gripper_close_rad]
-            )
-            try:
-                gripper_pos = interp_func(goal_pos[6])
-            except ValueError:
-                print("VALUE ERROR GRIPPER POS", goal_pos[6])
+
+
+            gripper_pos = map_range(goal_pos[6], 
+                                    self.config.leader_gripper_open_degree, 
+                                    self.config.leader_gripper_close_degree, 
+                                    self.config.follower_gripper_open_rad, 
+                                    self.config.follower_gripper_close_rad)
             
             
             self.follower_arms[name].set_catch_pos(np.array(gripper_pos, dtype=np.float32))   
