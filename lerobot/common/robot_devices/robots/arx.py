@@ -135,7 +135,12 @@ class ARXRobot:
                 # self.leader_arms[name].write("Velocity_Limit",  20,   "gripper")
                 # self.leader_arms[name].write("Profile_Velocity", 20,  "gripper")
                 self.leader_arms[name].write("Torque_Enable", 1, "gripper")
-                self.leader_arms[name].write("Goal_Position", self.config.leader_gripper_open_degree, "gripper")
+                if name == "right":
+                    self.leader_arms[name].write("Goal_Position", self.config.leader_gripper_open_degree_right, "gripper")
+                elif name == "left":
+                    self.leader_arms[name].write("Goal_Position", self.config.leader_gripper_open_degree_left, "gripper")
+                else:
+                    self.leader_arms[name].write("Goal_Position", self.config.leader_gripper_open_degree, "gripper")
         
         # ARX Follower
         for name in self.config.follower_arms:
@@ -147,7 +152,6 @@ class ARXRobot:
         #     self.leader_arms[name] = SingleArm(leader_config)
         # for name in self.leader_arms:
         #     self.leader_arms[name].gravity_compensation()
-        
         
         for name in self.cameras:
             self.cameras[name].connect()
@@ -219,12 +223,24 @@ class ARXRobot:
             self.follower_arms[name].set_joint_positions(np.deg2rad(np.array(goal_pos[:6], dtype=np.float32)))
             
 
-
-            gripper_pos = map_range(goal_pos[6], 
-                                    self.config.leader_gripper_open_degree, 
-                                    self.config.leader_gripper_close_degree, 
-                                    self.config.follower_gripper_open_rad, 
-                                    self.config.follower_gripper_close_rad)
+            if name == "right":
+                gripper_pos = map_range(goal_pos[6], 
+                                        self.config.leader_gripper_open_degree_right, 
+                                        self.config.leader_gripper_close_degree_right, 
+                                        self.config.follower_gripper_open_rad, 
+                                        self.config.follower_gripper_close_rad)
+            elif name == "left":
+                gripper_pos = map_range(goal_pos[6], 
+                                        self.config.leader_gripper_open_degree_left, 
+                                        self.config.leader_gripper_close_degree_left, 
+                                        self.config.follower_gripper_open_rad, 
+                                        self.config.follower_gripper_close_rad)
+            else:          
+                gripper_pos = map_range(goal_pos[6], 
+                                        self.config.leader_gripper_open_degree, 
+                                        self.config.leader_gripper_close_degree, 
+                                        self.config.follower_gripper_open_rad, 
+                                        self.config.follower_gripper_close_rad)
             
             
             self.follower_arms[name].set_catch_pos(np.array(gripper_pos, dtype=np.float32))   

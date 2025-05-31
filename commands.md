@@ -12,7 +12,7 @@ python lerobot/scripts/control_robot.py \
   --control.display_data=true
 
   python lerobot/scripts/control_robot.py \
-  --robot.type=arx \
+  --robot.type=arx_bimanual \
   --control.type=teleoperate \
   --control.fps=30 \
   --control.display_data=true
