@@ -16,7 +16,6 @@ from lerobot.common.robot_devices.robots.utils import get_arm_id
 from lerobot.common.robot_devices.utils import RobotDeviceAlreadyConnectedError, RobotDeviceNotConnectedError
 
 from bimanual import SingleArm
-from scipy.interpolate import interp1d
 
 def ensure_safe_goal_position(
     goal_pos: torch.Tensor, present_pos: torch.Tensor, max_relative_target: float | list[float]
@@ -217,9 +216,7 @@ class ARXRobot:
                 goal_pos[:6] = ensure_safe_goal_position(goal_pos[:6], present_pos[:6], self.config.max_relative_target)
         
             self.follower_arms[name].set_joint_positions(np.deg2rad(np.array(goal_pos[:6], dtype=np.float32)))
-            
-
-
+        
             gripper_pos = map_range(goal_pos[6], 
                                     self.config.leader_gripper_open_degree, 
                                     self.config.leader_gripper_close_degree, 
@@ -333,20 +330,47 @@ class ARXRobot:
         # to_idx = 0
         # action_sent = []
         for name in self.follower_arms:
-            # Get goal position of each follower arm by splitting the action vector
-            # to_idx += len(self.follower_arms[name].motor_names)
-            goal_pos = action
-            # from_idx = to_idx
 
-            # Save tensor to concat and return
+            goal_pos = torch.from_numpy(action.numpy().astype(np.float32))            
+            
+            if self.config.max_relative_target is not None:
+                present_pos = np.rad2deg(self.follower_arms[name].get_joint_positions())
+                present_pos = torch.from_numpy(present_pos).to(goal_pos.dtype)
+                goal_pos[:6] = ensure_safe_goal_position(goal_pos[:6], present_pos[:6], self.config.max_relative_target)
+        
+            self.follower_arms[name].set_joint_positions(np.deg2rad(np.array(goal_pos[:6], dtype=np.float32)))
+        
+            gripper_pos = map_range(goal_pos[6], 
+                                    self.config.leader_gripper_open_degree, 
+                                    self.config.leader_gripper_close_degree, 
+                                    self.config.follower_gripper_open_rad, 
+                                    self.config.follower_gripper_close_rad)
+            
+            
+            self.follower_arms[name].set_catch_pos(np.array(gripper_pos, dtype=np.float32))   
+            
+            ###
 
-            # Send goal position to each follower
-            goal_pos = goal_pos.numpy().astype(np.float32)
-            # self.follower_arms[name].set_joint_positions(goal_pos[:6])
-            # self.follower_arms[name].set_catch_pos(goal_pos[6])
+            # if self.config.max_relative_target is not None:
+            #     present_pos = self.follower_arms[name].get_joint_positions()[:6]
+            #     present_pos = torch.from_numpy(present_pos)
+            #     goal_pos[:6] = ensure_safe_goal_position(goal_pos[:6], present_pos, self.config.max_relative_target)            
+
+            # goal_pos = goal_pos.numpy().astype(np.float32)
+        
+            
+            # self.follower_arms[name].set_joint_positions(np.deg2rad(np.array(goal_pos[:6], dtype=np.float32)))
+        
+            # gripper_pos = map_range(goal_pos[6], 
+            #                         self.config.leader_gripper_open_degree, 
+            #                         self.config.leader_gripper_close_degree, 
+            #                         self.config.follower_gripper_open_rad, 
+            #                         self.config.follower_gripper_close_rad)    
+            # self.follower_arms[name].set_catch_pos(np.array(gripper_pos, dtype=np.float32))   
+            
+            
             action_sent=goal_pos
             
-
         return action_sent
 
 
