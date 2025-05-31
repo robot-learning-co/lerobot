@@ -37,6 +37,10 @@ from lerobot.common.robot_devices.robots.utils import Robot
 from lerobot.common.robot_devices.utils import busy_wait
 from lerobot.common.utils.utils import get_safe_torch_device, has_method
 
+# TRLC
+import cv2
+import numpy as np
+
 
 def log_control_info(robot: Robot, dt_s, episode_index=None, frame_index=None, fps=None):
     log_items = []
@@ -196,6 +200,7 @@ def record_episode(
     policy,
     fps,
     single_task,
+    masking=False,
 ):
     control_loop(
         robot=robot,
@@ -207,6 +212,7 @@ def record_episode(
         fps=fps,
         teleoperate=policy is None,
         single_task=single_task,
+        masking=masking,
     )
 
 
@@ -221,6 +227,7 @@ def control_loop(
     policy: PreTrainedPolicy = None,
     fps: int | None = None,
     single_task: str | None = None,
+    masking: bool = False,
 ):
     # TODO(rcadene): Add option to record logs
     if not robot.is_connected:
@@ -241,6 +248,83 @@ def control_loop(
     if dataset is not None and fps is not None and dataset.fps != fps:
         raise ValueError(f"The dataset fps should be equal to requested fps ({dataset['fps']} != {fps}).")
 
+    if masking:
+        import matplotlib.pyplot as plt
+        from sam2.build_sam import build_sam2_camera_predictor
+        sam2_checkpoint = "/home/ubuntu/trlc/segment-anything-2-real-time/checkpoints/sam2.1_hiera_small.pt"
+        model_cfg = "configs/sam2.1/sam2.1_hiera_s.yaml"
+        predictor = build_sam2_camera_predictor(model_cfg, sam2_checkpoint)
+        
+        
+        observation = robot.capture_observation()
+        first_frame = observation["observation.images.cam_head"].numpy()
+
+        clicked_point = {}
+
+        def onclick(event):
+            if event.xdata is not None and event.ydata is not None:
+                clicked_point['x'] = int(event.xdata)
+                clicked_point['y'] = int(event.ydata)
+                plt.close()
+
+        fig, ax = plt.subplots()
+        # Convert BGR to RGB for matplotlib
+        # img_rgb = first_frame[..., ::-1]
+        ax.imshow(first_frame)
+        ax.set_title("Click a point on the image")
+        cid = fig.canvas.mpl_connect('button_press_event', onclick)
+        plt.show()
+        fig.canvas.mpl_disconnect(cid)
+
+        if 'x' in clicked_point and 'y' in clicked_point:
+            print(f"Clicked point: ({clicked_point['x']}, {clicked_point['y']})")
+        else:
+            print("No point was clicked.")
+            
+        predictor.load_first_frame(first_frame)
+        
+        ann_frame_idx = 0
+        obj_id = 1
+        points = np.array([[clicked_point['x'], clicked_point['y']]], dtype=np.float32)
+        labels = np.array([1], dtype=np.int32)
+        _, out_obj_ids, out_mask_logits = predictor.add_new_prompt(
+            frame_idx=ann_frame_idx,
+            obj_id=obj_id,
+            points=points,
+            labels=labels
+        )
+        
+
+        h, w = first_frame.shape[:2]
+        mask_acc = np.zeros((h, w), dtype=np.uint8)
+        for logit in out_mask_logits:
+            m = (logit > 0).permute(1, 2, 0).cpu().numpy().astype(np.uint8).squeeze() * 255
+            mask_acc = cv2.bitwise_or(mask_acc, m)
+
+        alpha = 0.9  # how strongly red you want the tint: 0.0 = no tint, 1.0 = full red
+    
+        red_img = np.zeros_like(first_frame)
+        red_img[..., 0] = 255  # BGR → red channel
+
+        blended = cv2.addWeighted(first_frame, 1.0 - alpha, red_img, alpha, 0)
+        mask_bool = mask_acc.astype(bool)               # shape (h, w), True where mask
+        mask_3c  = np.repeat(mask_bool[:, :, None], 3, axis=2)
+
+        overlay = first_frame.copy()
+        overlay[mask_3c] = blended[mask_3c]
+        
+    
+        fig, ax = plt.subplots()
+
+        ax.imshow(overlay)
+        ax.set_title("Click a point on the image")
+        cid = fig.canvas.mpl_connect('button_press_event', onclick)
+        plt.show()
+        fig.canvas.mpl_disconnect(cid)
+        
+        
+
+
     timestamp = 0
     start_episode_t = time.perf_counter()
 
@@ -253,8 +337,73 @@ def control_loop(
 
         if teleoperate:
             observation, action = robot.teleop_step(record_data=True)
+        
+            if masking:    
+                frame_rgb = observation["observation.images.cam_head"].numpy()
+                out_obj_ids, out_mask_logits = predictor.track(frame_rgb)
+                
+                h, w = frame_rgb.shape[:2]
+                mask_acc = np.zeros((h, w), dtype=np.uint8)
+                for logit in out_mask_logits:
+                    m = (logit > 0).permute(1, 2, 0).cpu().numpy().astype(np.uint8).squeeze() * 255
+                    mask_acc = cv2.bitwise_or(mask_acc, m)
+                    
+                alpha = 0.9  # how strongly red you want the tint: 0.0 = no tint, 1.0 = full red
+    
+                red_img = np.zeros_like(frame_rgb)
+                red_img[..., 0] = 255  # BGR → red channel
+
+                blended = cv2.addWeighted(frame_rgb, 1.0 - alpha, red_img, alpha, 0)
+                mask_bool = mask_acc.astype(bool)             
+                mask_3c  = np.repeat(mask_bool[:, :, None], 3, axis=2)
+
+                overlay = frame_rgb.copy()
+                overlay[mask_3c] = blended[mask_3c]
+                
+                observation["observation.images.cam_head"] = torch.from_numpy(overlay)
+
+                print(type(observation["observation.images.cam_head"]))
+                print(observation["observation.images.cam_head"].shape)
+                print(observation["observation.images.cam_head"].dtype)
+                print(type(observation["observation.images.cam_wrist"]))
+                print(observation["observation.images.cam_wrist"].shape)
+                print(observation["observation.images.cam_wrist"].dtype)
+        
+        
         else:
             observation = robot.capture_observation()
+            
+            if masking:    
+                frame_rgb = observation["observation.images.cam_head"].numpy()
+                out_obj_ids, out_mask_logits = predictor.track(frame_rgb)
+                
+                h, w = frame_rgb.shape[:2]
+                mask_acc = np.zeros((h, w), dtype=np.uint8)
+                for logit in out_mask_logits:
+                    m = (logit > 0).permute(1, 2, 0).cpu().numpy().astype(np.uint8).squeeze() * 255
+                    mask_acc = cv2.bitwise_or(mask_acc, m)
+                    
+                alpha = 0.9  # how strongly red you want the tint: 0.0 = no tint, 1.0 = full red
+    
+                red_img = np.zeros_like(frame_rgb)
+                red_img[..., 0] = 255  # BGR → red channel
+
+                blended = cv2.addWeighted(frame_rgb, 1.0 - alpha, red_img, alpha, 0)
+                mask_bool = mask_acc.astype(bool)             
+                mask_3c  = np.repeat(mask_bool[:, :, None], 3, axis=2)
+
+                overlay = frame_rgb.copy()
+                overlay[mask_3c] = blended[mask_3c]
+                
+                observation["observation.images.cam_head"] = torch.from_numpy(overlay)
+
+                print(type(observation["observation.images.cam_head"]))
+                print(observation["observation.images.cam_head"].shape)
+                print(observation["observation.images.cam_head"].dtype)
+                print(type(observation["observation.images.cam_wrist"]))
+                print(observation["observation.images.cam_wrist"].shape)
+                print(observation["observation.images.cam_wrist"].dtype)
+            
             action = None
 
             if policy is not None:

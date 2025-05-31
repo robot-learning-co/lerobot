@@ -238,6 +238,7 @@ def teleoperate(robot: Robot, cfg: TeleoperateControlConfig):
         fps=cfg.fps,
         teleoperate=True,
         display_data=cfg.display_data,
+        masking=False,
     )
 
 
@@ -305,6 +306,7 @@ def record(
             policy=policy,
             fps=cfg.fps,
             single_task=cfg.single_task,
+            masking=True,
         )
 
         # Execute a few seconds without recording to give time to manually reset the environment
@@ -404,7 +406,7 @@ def _init_rerun(control_config: ControlConfig, session_name: str = "lerobot_cont
 
 @parser.wrap()
 def control_robot(cfg: ControlPipelineConfig):
-    # init_logging()
+    init_logging()
     logging.info(pformat(asdict(cfg)))
 
     robot = make_robot_from_config(cfg.robot)
