@@ -73,13 +73,39 @@ class ARXRobot:
         return {
             "action": {
                 "dtype": "float32",
-                "shape": (7,),
-                "names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "gripper"],
+                "shape": (14,),
+                "names": ["left_joint1", 
+                          "left_joint2", 
+                          "left_joint3", 
+                          "left_joint4", 
+                          "left_joint5", 
+                          "left_joint6", 
+                          "left_gripper"
+                          "right_joint1", 
+                          "right_joint2", 
+                          "right_joint3", 
+                          "right_joint4", 
+                          "right_joint5", 
+                          "right_joint6", 
+                          "right_gripper"],
             },
             "observation.state": {
                 "dtype": "float32",
-                "shape": (7,),
-                "names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6", "gripper"],
+                "shape": (14,),
+                "names": ["left_joint1", 
+                          "left_joint2", 
+                          "left_joint3", 
+                          "left_joint4", 
+                          "left_joint5", 
+                          "left_joint6", 
+                          "left_gripper"
+                          "right_joint1", 
+                          "right_joint2", 
+                          "right_joint3", 
+                          "right_joint4", 
+                          "right_joint5", 
+                          "right_joint6", 
+                          "right_gripper"],
             },
         }
 

@@ -679,10 +679,7 @@ class LeKiwiRobotConfig(RobotConfig):
 @dataclass
 class ARXRobotConfig(RobotConfig):
     calibration_dir: str = ".cache/calibration/arx"
-    # `max_relative_target` limits the magnitude of the relative positional target vector for safety purposes.
-    # Set this to a positive scalar to have the same value for all motors, or a list that is the same length as
-    # the number of motors in your follower arms.
-    max_relative_target: int | None = 3
+    max_relative_target: int | None = 10
     
     leader_gripper_open_degree: float = 68.0 #deg
     leader_gripper_close_degree: float = 120.0 #deg
@@ -693,7 +690,7 @@ class ARXRobotConfig(RobotConfig):
     leader_arms: dict[str, MotorsBusConfig] = field(
         default_factory=lambda: {
             "main": DynamixelMotorsBusConfig(
-                port="/dev/ttyACM0",
+                port="/dev/ttyACM2",
                 motors={
                     # name: (index, model)
                     "joint1": [1, "xl330-m077"],
@@ -720,14 +717,109 @@ class ARXRobotConfig(RobotConfig):
             "cam_wrist": IntelRealSenseCameraConfig(
                 serial_number=218622271287,
                 fps=30,
-                width=640,
-                height=480,
+                width=480,
+                height=270,
+            ),
+            "cam_wrist2": IntelRealSenseCameraConfig(
+                serial_number=130322272259,
+                fps=30,
+                width=480,
+                height=270,
             ),
             "cam_head": IntelRealSenseCameraConfig(
                 serial_number=218622270205,
                 fps=30,
-                width=640,
-                height=480,
+                width=480,
+                height=270,
             ),
+            "cam_belly": IntelRealSenseCameraConfig(
+                serial_number=130322271806,
+                fps=30,
+                width=480,
+                height=270,
+            ),
+        }
+    )
+    
+@RobotConfig.register_subclass("arx_bimanual")
+@dataclass
+class ARXBimanualRobotConfig(RobotConfig):
+    calibration_dir: str = ".cache/calibration/arx_bimanual"
+    max_relative_target: int | None = 10
+    
+    leader_gripper_open_degree: float = 68.0 #deg
+    leader_gripper_close_degree: float = 120.0 #deg
+    follower_gripper_open_rad: float = 5.2 #rad
+    follower_gripper_close_rad: float = 0.0 #rad
+    
+
+    leader_arms: dict[str, MotorsBusConfig] = field(
+        default_factory=lambda: {
+            "left": DynamixelMotorsBusConfig(
+                port="/dev/ttyACM1",
+                motors={
+                    # name: (index, model)
+                    "joint1": [1, "xl330-m077"],
+                    "joint2": [2, "xl330-m077"],
+                    "joint3": [3, "xl330-m077"],
+                    "joint4": [4, "xl330-m077"],
+                    "joint5": [5, "xl330-m077"],
+                    "joint6": [6, "xl330-m077"],
+                    "gripper": [7, "xl330-m077"],
+                },
+            ),
+            "right": DynamixelMotorsBusConfig(
+                port="/dev/ttyACM0",
+                motors={
+                    # name: (index, model)
+                    "joint1": [1, "xl330-m077"],
+                    "joint2": [2, "xl330-m077"],
+                    "joint3": [3, "xl330-m077"],
+                    "joint4": [4, "xl330-m077"],
+                    "joint5": [5, "xl330-m077"],
+                    "joint6": [6, "xl330-m077"],
+                    "gripper": [7, "xl330-m077"],
+                },
+            ),
+        }
+    )
+    
+    follower_arms = {
+        "left": {
+            "can_port": "can1",
+            "type": 0,
+        },
+        "right": {
+            "can_port": "can2",
+            "type": 0,
+        }
+    }
+    
+    cameras: dict[str, CameraConfig] = field(
+        default_factory=lambda: {
+            "cam_wrist_left": IntelRealSenseCameraConfig(
+                serial_number=130322272259,
+                fps=30,
+                width=480,
+                height=270,
+            ),
+            "cam_wrist_right": IntelRealSenseCameraConfig(
+                serial_number=218622271287,
+                fps=30,
+                width=480,
+                height=270,
+            ),
+            "cam_head_right": IntelRealSenseCameraConfig(
+                serial_number=218622270205,
+                fps=30,
+                width=480,
+                height=270,
+            ),
+            #"cam_head_left": IntelRealSenseCameraConfig(
+            #    serial_number=130322271806,
+            #    fps=30,
+            #    width=480,
+            #    height=270,
+            #),
         }
     )
