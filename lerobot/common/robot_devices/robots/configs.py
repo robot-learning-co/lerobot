@@ -27,6 +27,7 @@ from lerobot.common.robot_devices.motors.configs import (
     DynamixelMotorsBusConfig,
     FeetechMotorsBusConfig,
     MotorsBusConfig,
+    TrossenArmDriverConfig,
 )
 
 
@@ -815,6 +816,91 @@ class ARXBimanualRobotConfig(RobotConfig):
                 width=480,
                 height=270,
             ),
+            #"cam_head_left": IntelRealSenseCameraConfig(
+            #    serial_number=130322271806,
+            #    fps=30,
+            #    width=480,
+            #    height=270,
+            #),
+        }
+    )
+    
+@RobotConfig.register_subclass("trossen_bimanual")
+@dataclass
+class TrossenBimanualRobotConfig(RobotConfig):
+    calibration_dir: str = ".cache/calibration/trossen_bimanual"
+    max_relative_target: int | None = 10
+    
+    leader_gripper_open_degree: float = 68.0 #deg
+    leader_gripper_close_degree: float = 120.0 #deg
+    
+    follower_gripper_open_m: float = 0.04 #m
+    follower_gripper_close_m: float = 0.0 #m
+    
+    leader_arms: dict[str, MotorsBusConfig] = field(
+        default_factory=lambda: {
+            "left": DynamixelMotorsBusConfig(
+                port="/dev/ttyACM1",
+                motors={
+                    # name: (index, model)
+                    "joint1": [1, "xl330-m077"],
+                    "joint2": [2, "xl330-m077"],
+                    "joint3": [3, "xl330-m077"],
+                    "joint4": [4, "xl330-m077"],
+                    "joint5": [5, "xl330-m077"],
+                    "joint6": [6, "xl330-m077"],
+                    "gripper": [7, "xl330-m077"],
+                },
+            ),
+            "right": DynamixelMotorsBusConfig(
+                port="/dev/ttyACM0",
+                motors={
+                    # name: (index, model)
+                    "joint1": [1, "xl330-m077"],
+                    "joint2": [2, "xl330-m077"],
+                    "joint3": [3, "xl330-m077"],
+                    "joint4": [4, "xl330-m077"],
+                    "joint5": [5, "xl330-m077"],
+                    "joint6": [6, "xl330-m077"],
+                    "gripper": [7, "xl330-m077"],
+                },
+            ),
+        }
+    )
+                
+    follower_arms: dict[str, MotorsBusConfig] = field(
+        default_factory=lambda: {
+            "left": TrossenArmDriverConfig(
+                ip="192.168.88.3",
+                model="V0_FOLLOWER",
+            ),
+            "right": TrossenArmDriverConfig(
+                ip="192.168.88.2",
+                model="V0_FOLLOWER",
+            ),
+        }
+    )
+    
+    cameras: dict[str, CameraConfig] = field(
+        default_factory=lambda: {
+            # "cam_wrist_left": IntelRealSenseCameraConfig(
+            #     serial_number=130322272259,
+            #     fps=30,
+            #     width=480,
+            #     height=270,
+            # ),
+            # "cam_wrist_right": IntelRealSenseCameraConfig(
+            #     serial_number=218622271287,
+            #     fps=30,
+            #     width=480,
+            #     height=270,
+            # ),
+            # "cam_head_right": IntelRealSenseCameraConfig(
+            #     serial_number=218622270205,
+            #     fps=30,
+            #     width=480,
+            #     height=270,
+            # ),
             #"cam_head_left": IntelRealSenseCameraConfig(
             #    serial_number=130322271806,
             #    fps=30,
