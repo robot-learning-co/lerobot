@@ -236,18 +236,15 @@ class TrossenRobot:
         for name in self.follower_arms:
             before_fwrite_t = time.perf_counter()
             goal_pos = leader_pos[name]
-
-            # follower_goal_pos[name] = goal_pos
-            # goal_pos = torch.from_numpy(goal_pos.numpy().astype(np.float32))
             
             if self.config.max_relative_target is not None:
                 present_pos = np.rad2deg(self.follower_arms[name].read("Present_Position"))
                 present_pos = torch.from_numpy(present_pos)
                 goal_pos[:6] = ensure_safe_goal_position(goal_pos[:6], present_pos[:6], self.config.max_relative_target)
-        
             
             follower_goal_pos[name] = goal_pos
 
+            # WRITE RAD
             goal_pos = goal_pos.numpy().astype(np.float32)
             goal_pos[:6] = np.deg2rad(goal_pos[:6])
             goal_pos[6] = map_range(goal_pos[6], 
@@ -256,17 +253,9 @@ class TrossenRobot:
                                     self.config.follower_gripper_open_m, 
                                     self.config.follower_gripper_close_m)
             
-            print(goal_pos[6])
-            
-            
-            print("GOAL POS", np.round(goal_pos, 2))
             self.follower_arms[name].write("Goal_Position", goal_pos)
-            # self.logs[f"write_follower_{name}_goal_pos_dt_s"] = time.perf_counter() - before_fwrite_t
-            
-            
-            #print("GRIPPER POS", gripper_pos)             
-            
-            # self.logs[f"write_follower_{name}_goal_pos_dt_s"] = time.perf_counter() - before_fwrite_t
+        
+            self.logs[f"write_follower_{name}_goal_pos_dt_s"] = time.perf_counter() - before_fwrite_t
 
         # Early exit when recording data is not requested
         if not record_data:
@@ -276,7 +265,7 @@ class TrossenRobot:
         follower_pos = {}
         for name in self.follower_arms:
             before_fread_t = time.perf_counter()
-            follower_pos[name] = np.rad2deg(self.follower_arms[name].get_joint_positions())
+            follower_pos[name] = np.rad2deg(self.follower_arms[name].read("Present_Position"))
             follower_pos[name] = torch.from_numpy(np.array(follower_pos[name], dtype=np.float32))
             self.logs[f"read_follower_{name}_pos_dt_s"] = time.perf_counter() - before_fread_t
 
@@ -323,7 +312,7 @@ class TrossenRobot:
         follower_pos = {}
         for name in self.follower_arms:
             before_fread_t = time.perf_counter()
-            follower_pos[name] = np.rad2deg(self.follower_arms[name].get_joint_positions())
+            follower_pos[name] = np.rad2deg(self.follower_arms[name].read("Present_Position"))
             follower_pos[name] = torch.from_numpy(np.array(follower_pos[name], dtype=np.float32))
             self.logs[f"read_follower_{name}_pos_dt_s"] = time.perf_counter() - before_fread_t
 
@@ -373,41 +362,20 @@ class TrossenRobot:
             goal_pos = torch.from_numpy(action.numpy().astype(np.float32))            
             
             if self.config.max_relative_target is not None:
-                present_pos = np.rad2deg(self.follower_arms[name].get_joint_positions())
-                present_pos = torch.from_numpy(present_pos).to(goal_pos.dtype)
+                present_pos = np.rad2deg(self.follower_arms[name].read("Present_Position"))
+                present_pos = torch.from_numpy(present_pos)
                 goal_pos[:6] = ensure_safe_goal_position(goal_pos[:6], present_pos[:6], self.config.max_relative_target)
         
-            self.follower_arms[name].set_joint_positions(np.deg2rad(np.array(goal_pos[:6], dtype=np.float32)))
-        
-            gripper_pos = map_range(goal_pos[6], 
+            goal_pos = goal_pos.numpy().astype(np.float32)
+            goal_pos[:6] = np.deg2rad(goal_pos[:6])
+            goal_pos[6] = map_range(goal_pos[6], 
                                     self.config.leader_gripper_open_degree, 
                                     self.config.leader_gripper_close_degree, 
-                                    self.config.follower_gripper_open_rad, 
-                                    self.config.follower_gripper_close_rad)
+                                    self.config.follower_gripper_open_m, 
+                                    self.config.follower_gripper_close_m)
             
-            
-            self.follower_arms[name].set_catch_pos(np.array(gripper_pos, dtype=np.float32))   
-            
-            ###
-
-            # if self.config.max_relative_target is not None:
-            #     present_pos = self.follower_arms[name].get_joint_positions()[:6]
-            #     present_pos = torch.from_numpy(present_pos)
-            #     goal_pos[:6] = ensure_safe_goal_position(goal_pos[:6], present_pos, self.config.max_relative_target)            
-
-            # goal_pos = goal_pos.numpy().astype(np.float32)
-        
-            
-            # self.follower_arms[name].set_joint_positions(np.deg2rad(np.array(goal_pos[:6], dtype=np.float32)))
-        
-            # gripper_pos = map_range(goal_pos[6], 
-            #                         self.config.leader_gripper_open_degree, 
-            #                         self.config.leader_gripper_close_degree, 
-            #                         self.config.follower_gripper_open_rad, 
-            #                         self.config.follower_gripper_close_rad)    
-            # self.follower_arms[name].set_catch_pos(np.array(gripper_pos, dtype=np.float32))   
-            
-            
+            self.follower_arms[name].write("Goal_Position", goal_pos)
+                
             action_sent=goal_pos
             
         return action_sent

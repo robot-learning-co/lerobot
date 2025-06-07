@@ -184,6 +184,7 @@ class TrossenArmDriver:
 
         values = np.array(values, dtype=np.float32)
         return values
+    
 
     def write(self, data_name, values: int | float | np.ndarray, motor_names: str | list[str] | None = None):
         if not self.is_connected:
@@ -210,7 +211,7 @@ class TrossenArmDriver:
             self.driver.set_all_modes(trossen.Mode.velocity)
             self.driver.set_all_velocities([0.0] * self.driver.get_num_joints(), 0.0, False)
             self.driver.set_all_modes(trossen.Mode.position)
-            self.driver.set_all_positions(self.home_pose, 2.0, False)
+            #self.driver.set_all_positions(self.home_pose, 2.0, False)
         elif data_name == "External_Efforts":
             self.driver.set_all_external_efforts(values.tolist(), 0.0, False)
         else:
@@ -226,7 +227,7 @@ class TrossenArmDriver:
         self.driver.set_all_modes(trossen.Mode.velocity)
         self.driver.set_all_velocities([0.0] * self.driver.get_num_joints(), 0.0, False)
         self.driver.set_all_modes(trossen.Mode.position)
-        self.driver.set_all_positions(self.home_pose, 2.0, True)
+        #self.driver.set_all_positions(self.home_pose, 2.0, True)
         self.driver.set_all_positions(self.sleep_pose, 2.0, False)
 
         self.is_connected = False

@@ -27,6 +27,7 @@ from lerobot.common.robot_devices.robots.configs import (
     StretchRobotConfig,
     ARXRobotConfig,
     ARXBimanualRobotConfig,
+    TrossenBimanualRobotConfig
 )
 
 
@@ -71,6 +72,8 @@ def make_robot_config(robot_type: str, **kwargs) -> RobotConfig:
         return ARXRobotConfig(**kwargs)
     elif robot_type == "arx_bimanual":
         return ARXBimanualRobotConfig(**kwargs)
+    elif robot_type == "trossen_bimanual":
+        return TrossenBimanualRobotConfig(**kwargs)
     else:
         raise ValueError(f"Robot type '{robot_type}' is not available.")
 
@@ -92,6 +95,10 @@ def make_robot_from_config(config: RobotConfig):
     elif isinstance(config, ARXBimanualRobotConfig):
         from lerobot.common.robot_devices.robots.arx import ARXRobot
         return ARXRobot(config)
+    
+    elif isinstance(config, TrossenBimanualRobotConfig):
+        from lerobot.common.robot_devices.robots.trossen import TrossenRobot
+        return TrossenRobot(config)
     
     else:
         from lerobot.common.robot_devices.robots.stretch import StretchRobot

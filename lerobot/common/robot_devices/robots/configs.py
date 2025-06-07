@@ -883,29 +883,29 @@ class TrossenBimanualRobotConfig(RobotConfig):
     
     cameras: dict[str, CameraConfig] = field(
         default_factory=lambda: {
-            # "cam_wrist_left": IntelRealSenseCameraConfig(
-            #     serial_number=130322272259,
-            #     fps=30,
-            #     width=480,
-            #     height=270,
-            # ),
-            # "cam_wrist_right": IntelRealSenseCameraConfig(
-            #     serial_number=218622271287,
-            #     fps=30,
-            #     width=480,
-            #     height=270,
-            # ),
-            # "cam_head_right": IntelRealSenseCameraConfig(
-            #     serial_number=218622270205,
-            #     fps=30,
-            #     width=480,
-            #     height=270,
-            # ),
-            #"cam_head_left": IntelRealSenseCameraConfig(
-            #    serial_number=130322271806,
-            #    fps=30,
-            #    width=480,
-            #    height=270,
-            #),
+            "cam_wrist_left": IntelRealSenseCameraConfig(
+                serial_number=230322273626,
+                fps=30,
+                width=480,
+                height=270,
+            ),
+            "cam_wrist_right": IntelRealSenseCameraConfig(
+                serial_number=218622278989,
+                fps=30,
+                width=480,
+                height=270,
+            ),
+            "cam_head": IntelRealSenseCameraConfig(
+                serial_number=218622270205,
+                fps=30,
+                width=480,
+                height=270,
+            ),
+            "cam_belly": IntelRealSenseCameraConfig(
+               serial_number=130322272259,
+               fps=30,
+               width=480,
+               height=270,
+            ),
         }
     )
