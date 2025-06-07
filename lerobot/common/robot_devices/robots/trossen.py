@@ -56,6 +56,10 @@ class TrossenRobot:
         self.is_connected = False
         self.logs = {}
 
+
+    def get_motor_names(self, arm: dict[str, MotorsBus]) -> list:
+        return [f"{arm}_{motor}" for arm, bus in arm.items() for motor in bus.motors]
+    
     @property
     def camera_features(self) -> dict:
         cam_ft = {}
@@ -70,42 +74,18 @@ class TrossenRobot:
 
     @property
     def motor_features(self) -> dict:
+        action_names = self.get_motor_names(self.leader_arms)
+        state_names = self.get_motor_names(self.leader_arms)
         return {
             "action": {
                 "dtype": "float32",
-                "shape": (14,),
-                "names": ["left_joint1", 
-                          "left_joint2", 
-                          "left_joint3", 
-                          "left_joint4", 
-                          "left_joint5", 
-                          "left_joint6", 
-                          "left_gripper"
-                          "right_joint1", 
-                          "right_joint2", 
-                          "right_joint3", 
-                          "right_joint4", 
-                          "right_joint5", 
-                          "right_joint6", 
-                          "right_gripper"],
+                "shape": (len(action_names),),
+                "names": action_names,
             },
             "observation.state": {
                 "dtype": "float32",
-                "shape": (14,),
-                "names": ["left_joint1", 
-                          "left_joint2", 
-                          "left_joint3", 
-                          "left_joint4", 
-                          "left_joint5", 
-                          "left_joint6", 
-                          "left_gripper"
-                          "right_joint1", 
-                          "right_joint2", 
-                          "right_joint3", 
-                          "right_joint4", 
-                          "right_joint5", 
-                          "right_joint6", 
-                          "right_gripper"],
+                "shape": (len(state_names),),
+                "names": state_names,
             },
         }
 
