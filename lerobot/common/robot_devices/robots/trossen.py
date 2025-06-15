@@ -334,12 +334,14 @@ class TrossenRobot:
                 "ManipulatorRobot is not connected. You need to run `robot.connect()`."
             )
 
-        # from_idx = 0
-        # to_idx = 0
-        # action_sent = []
+        from_idx = 0
+        to_idx = 0
+        action_sent = []
         for name in self.follower_arms:
 
-            goal_pos = torch.from_numpy(action.numpy().astype(np.float32))            
+            to_idx += len(self.follower_arms[name].motor_names)
+            goal_pos = action[from_idx:to_idx]
+            from_idx = to_idx          
             
             if self.config.max_relative_target is not None:
                 present_pos = np.rad2deg(self.follower_arms[name].read("Present_Position"))
@@ -354,12 +356,13 @@ class TrossenRobot:
                                     self.config.follower_gripper_open_m, 
                                     self.config.follower_gripper_close_m)
             
+            action_sent.append(torch.from_numpy(goal_pos))
+            
+            # goal_pos = goal_pos.numpy().astype(np.float32)
             self.follower_arms[name].write("Goal_Position", goal_pos)
                 
-            action_sent=goal_pos
             
-        return action_sent
-
+        return torch.cat(action_sent)
 
     def disconnect(self):
         if not self.is_connected:
