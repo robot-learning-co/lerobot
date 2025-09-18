@@ -95,6 +95,10 @@ from lerobot.teleoperators import (  # noqa: F401
     so100_leader,
     so101_leader,
 )
+
+from trlc_dk1.leader import DK1Leader
+from trlc_dk1.follower import DK1Follower
+
 from lerobot.teleoperators.keyboard.teleop_keyboard import KeyboardTeleop
 from lerobot.utils.control_utils import (
     init_keyboard_listener,

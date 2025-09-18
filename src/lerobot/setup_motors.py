@@ -44,6 +44,9 @@ from lerobot.teleoperators import (  # noqa: F401
     so101_leader,
 )
 
+from trlc_dk1.leader import DK1Leader
+from trlc_dk1.follower import DK1Follower
+
 COMPATIBLE_DEVICES = [
     "koch_follower",
     "koch_leader",
