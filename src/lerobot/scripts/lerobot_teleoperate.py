@@ -88,6 +88,7 @@ from lerobot.teleoperators import (  # noqa: F401
     so100_leader,
     so101_leader,
 )
+from lerobot.utils.import_utils import register_third_party_devices
 from lerobot.utils.robot_utils import busy_wait
 from lerobot.utils.utils import init_logging, move_cursor_up
 from lerobot.utils.visualization_utils import init_rerun, log_rerun_data
@@ -106,6 +107,10 @@ class TeleoperateConfig:
     teleop_time_s: float | None = None
     # Display all cameras on screen
     display_data: bool = False
+    # Display data on a remote Rerun server
+    display_url: str = None
+    # Port of the remote Rerun server
+    display_port: int = 9876
 
 
 def teleop_loop(
@@ -188,7 +193,7 @@ def teleoperate(cfg: TeleoperateConfig):
     init_logging()
     logging.info(pformat(asdict(cfg)))
     if cfg.display_data:
-        init_rerun(session_name="teleoperation")
+        init_rerun(session_name="teleoperation", url=cfg.display_url, port=cfg.display_port)
 
     teleop = make_teleoperator_from_config(cfg.teleop)
     robot = make_robot_from_config(cfg.robot)
@@ -218,6 +223,7 @@ def teleoperate(cfg: TeleoperateConfig):
 
 
 def main():
+    register_third_party_devices()
     teleoperate()
 
 
