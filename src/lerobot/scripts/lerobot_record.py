@@ -112,6 +112,8 @@ from lerobot.teleoperators import (  # noqa: F401
 
 from trlc_dk1.leader import DK1Leader
 from trlc_dk1.follower import DK1Follower
+from trlc_dk1.bi_follower import BiDK1Follower
+from trlc_dk1.bi_leader import BiDK1Leader
 
 from lerobot.teleoperators.keyboard.teleop_keyboard import KeyboardTeleop
 from lerobot.utils.constants import ACTION, OBS_STR

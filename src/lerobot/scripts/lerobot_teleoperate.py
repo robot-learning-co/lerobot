@@ -95,6 +95,8 @@ from lerobot.utils.visualization_utils import init_rerun, log_rerun_data
 
 from trlc_dk1.follower import DK1Follower
 from trlc_dk1.leader import DK1Leader
+from trlc_dk1.bi_follower import BiDK1Follower
+from trlc_dk1.bi_leader import BiDK1Leader
 
 
 @dataclass

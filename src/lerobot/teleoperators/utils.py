@@ -81,6 +81,10 @@ def make_teleoperator_from_config(config: TeleoperatorConfig) -> Teleoperator:
         from trlc_dk1.leader import DK1Leader
 
         return DK1Leader(config)
+    elif config.type == "bi_dk1_leader":
+        from trlc_dk1.bi_leader import BiDK1Leader
+
+        return BiDK1Leader(config)
     else:
         try:
             return cast(Teleoperator, make_device_from_device_class(config))

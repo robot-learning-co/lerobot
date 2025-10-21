@@ -64,6 +64,10 @@ def make_robot_from_config(config: RobotConfig) -> Robot:
         from trlc_dk1.follower import DK1Follower
 
         return DK1Follower(config)
+    elif config.type == "bi_dk1_follower":
+        from trlc_dk1.bi_follower import BiDK1Follower
+
+        return BiDK1Follower(config)
     else:
         try:
             return cast(Robot, make_device_from_device_class(config))
