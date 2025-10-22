@@ -36,32 +36,165 @@ from lerobot.processor import PolicyAction, PolicyProcessorPipeline
 from lerobot.robots import Robot
 
 
+import os
+import sys
+import threading
+import time
+from contextlib import contextmanager
+
 @cache
 def is_headless():
     """
-    Detects if the Python script is running in a headless environment (e.g., without a display).
+    Detect whether we should run in headless/SSH mode.
 
-    This function attempts to import `pynput`, a library that requires a graphical environment.
-    If the import fails, it assumes the environment is headless. The result is cached to avoid
-    re-running the check.
-
-    Returns:
-        True if the environment is determined to be headless, False otherwise.
+    Heuristics:
+    - No GUI display (no $DISPLAY on POSIX) -> headless
+    - On Windows, assume non-headless (pynput should work) unless explicitly broken.
+    - If pynput import works AND a display is present, treat as non-headless.
     """
-    try:
-        import pynput  # noqa
+    # POSIX: if there's no DISPLAY, we’re almost certainly headless/SSH
+    if os.name != "nt" and not os.environ.get("DISPLAY"):
+        return True
 
+    try:
+        import pynput  # noqa: F401
         return False
     except Exception:
-        print(
-            "Error trying to import pynput. Switching to headless mode. "
-            "As a result, the video stream from the cameras won't be shown, "
-            "and you won't be able to change the control flow with keyboards. "
-            "For more info, see traceback below.\n"
-        )
-        traceback.print_exc()
-        print()
+        # Either import failed or no backend available -> headless
         return True
+
+class _HeadlessKeyListener:
+    """
+    Minimal stdin-based key listener that mimics pynput.Listener enough for this script.
+
+    - start(): starts a background thread reading from stdin
+    - stop(): stops it and restores terminal state
+    - Works in SSH/TTY sessions.
+    """
+
+    def __init__(self, on_press):
+        self._on_press = on_press
+        self._stop = threading.Event()
+        self._thread = None
+        self._is_tty = sys.stdin.isatty()
+        self._restore_ctx = None
+
+    def start(self):
+        if not self._is_tty:
+            # Nothing to do: no TTY to read from (e.g., piped)
+            return
+
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+        # best-effort restore (POSIX only)
+        if self._restore_ctx is not None:
+            try:
+                self._restore_ctx.__exit__(None, None, None)
+            except Exception:
+                pass
+
+    def _run(self):
+        if os.name == "nt":
+            self._run_windows()
+        else:
+            self._run_posix()
+
+    # ---------- POSIX ----------
+    @contextmanager
+    def _raw_tty(self):
+        import termios, tty  # POSIX only
+
+        fd = sys.stdin.fileno()
+        old_attrs = termios.tcgetattr(fd)
+        try:
+            tty.setcbreak(fd)  # cbreak is more forgiving than raw and works fine here
+            yield
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_attrs)
+
+    def _read_posix_nonblocking(self):
+        import select
+        rlist, _, _ = select.select([sys.stdin], [], [], 0.05)
+        if rlist:
+            return os.read(sys.stdin.fileno(), 32)  # read up to 32 bytes
+        return b""
+
+    def _run_posix(self):
+        # Arrow keys arrive as escape sequences: ESC [ C (right), ESC [ D (left)
+        # Esc alone is just b'\x1b'
+        with self._raw_tty() as ctx:
+            self._restore_ctx = ctx  # store for stop()
+            buf = b""
+            while not self._stop.is_set():
+                chunk = self._read_posix_nonblocking()
+                if not chunk:
+                    continue
+                buf += chunk
+
+                # Consume sequences in buffer
+                while buf:
+                    # ESC sequences
+                    if buf.startswith(b"\x1b["):
+                        # Need at least 3 bytes for ESC [ X
+                        if len(buf) < 3:
+                            break  # wait for more
+                        seq = buf[:3]
+                        buf = buf[3:]
+                        if seq == b"\x1b[C":  # Right arrow
+                            self._safe_on_press(("ARROW_RIGHT",))
+                        elif seq == b"\x1b[D":  # Left arrow
+                            self._safe_on_press(("ARROW_LEFT",))
+                        else:
+                            # Unhandled CSI, swallow
+                            pass
+                    elif buf.startswith(b"\x1b"):
+                        # Lone ESC
+                        buf = buf[1:]
+                        self._safe_on_press(("ESC",))
+                    else:
+                        # Other chars (Enter, letters, etc.) — we ignore.
+                        # Consume one byte to avoid infinite loop.
+                        buf = buf[1:]
+
+    # ---------- Windows ----------
+    def _run_windows(self):
+        # Windows arrow keys: first a prefix (224) then a code:
+        # 77 = right, 75 = left. ESC = 27.
+        import msvcrt
+
+        while not self._stop.is_set():
+            if not msvcrt.kbhit():
+                time.sleep(0.05)
+                continue
+            ch = msvcrt.getch()
+            if not ch:
+                continue
+            c = ch[0] if isinstance(ch, bytes) else ch
+
+            if c == 27:  # ESC
+                self._safe_on_press(("ESC",))
+            elif c in (0, 224):
+                # Arrow/function sequence
+                nxt = msvcrt.getch()
+                if not nxt:
+                    continue
+                n = nxt[0] if isinstance(nxt, bytes) else nxt
+                if n == 77:
+                    self._safe_on_press(("ARROW_RIGHT",))
+                elif n == 75:
+                    self._safe_on_press(("ARROW_LEFT",))
+                # else ignore others
+
+    def _safe_on_press(self, key_tuple):
+        try:
+            self._on_press(key_tuple)
+        except Exception as e:
+            print(f"Error handling key press: {e}", file=sys.stderr)
 
 
 def predict_action(
@@ -117,37 +250,44 @@ def predict_action(
 
 def init_keyboard_listener():
     """
-    Initializes a non-blocking keyboard listener for real-time user interaction.
-
-    This function sets up a listener for specific keys (right arrow, left arrow, escape) to control
-    the program flow during execution, such as stopping recording or exiting loops. It gracefully
-    handles headless environments where keyboard listening is not possible.
+    Initializes a non-blocking keyboard listener that works BOTH with a GUI (pynput)
+    and headless SSH sessions (stdin-based).
 
     Returns:
-        A tuple containing:
-        - The `pynput.keyboard.Listener` instance, or `None` if in a headless environment.
-        - A dictionary of event flags (e.g., `exit_early`) that are set by key presses.
+        (listener, events)
+        - listener: object with .start() and .stop() methods (pynput.Listener or _HeadlessKeyListener)
+        - events: dict with flags: exit_early, rerecord_episode, stop_recording
     """
-    # Allow to exit early while recording an episode or resetting the environment,
-    # by tapping the right arrow key '->'. This might require a sudo permission
-    # to allow your terminal to monitor keyboard events.
-    events = {}
-    events["exit_early"] = False
-    events["rerecord_episode"] = False
-    events["stop_recording"] = False
+    events = {
+        "exit_early": False,
+        "rerecord_episode": False,
+        "stop_recording": False,
+    }
 
-    if is_headless():
-        logging.warning(
-            "Headless environment detected. On-screen cameras display and keyboard inputs will not be available."
-        )
-        listener = None
-        return listener, events
+    def set_flag(key):
+        """
+        Normalized key handler. For GUI mode, `key` looks like pynput keyboard keys.
+        For headless mode, `key` is a tuple like ("ARROW_RIGHT",) or ("ESC",).
+        """
+        # Headless normalized tuples
+        if isinstance(key, tuple):
+            if key == ("ARROW_RIGHT",):
+                print("Right arrow key pressed. Exiting loop...")
+                events["exit_early"] = True
+            elif key == ("ARROW_LEFT",):
+                print("Left arrow key pressed. Exiting loop and rerecord the last episode...")
+                events["rerecord_episode"] = True
+                events["exit_early"] = True
+            elif key == ("ESC",):
+                print("Escape key pressed. Stopping data recording...")
+                events["stop_recording"] = True
+                events["exit_early"] = True
+            return
 
-    # Only import pynput if not in a headless environment
-    from pynput import keyboard
-
-    def on_press(key):
+        # pynput mode
         try:
+            from pynput import keyboard  # imported only if available
+
             if key == keyboard.Key.right:
                 print("Right arrow key pressed. Exiting loop...")
                 events["exit_early"] = True
@@ -159,12 +299,26 @@ def init_keyboard_listener():
                 print("Escape key pressed. Stopping data recording...")
                 events["stop_recording"] = True
                 events["exit_early"] = True
-        except Exception as e:
-            print(f"Error handling key press: {e}")
+        except Exception:
+            # If pynput import fails mid-run, ignore
+            pass
 
-    listener = keyboard.Listener(on_press=on_press)
+    if is_headless():
+        # Headless: use stdin-based listener
+        listener = _HeadlessKeyListener(on_press=set_flag)
+        listener.start()
+        if not sys.stdin.isatty():
+            logging.warning(
+                "Headless mode detected but no TTY on stdin. Keyboard inputs won’t be available."
+            )
+        else:
+            logging.info("Headless keyboard listener active (SSH/TTY).")
+        return listener, events
+
+    # GUI-capable: use pynput
+    from pynput import keyboard
+    listener = keyboard.Listener(on_press=set_flag)
     listener.start()
-
     return listener, events
 
 
