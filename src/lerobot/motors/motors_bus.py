@@ -27,6 +27,7 @@ from enum import Enum
 from functools import cached_property
 from pprint import pformat
 from typing import Protocol, TypeAlias
+import time
 
 import serial
 from deepdiff import DeepDiff
@@ -435,8 +436,18 @@ class MotorsBus(abc.ABC):
         try:
             if not self.port_handler.openPort():
                 raise OSError(f"Failed to open port '{self.port}'.")
-            elif handshake:
+            
+            self.port_handler.clearPort()
+            time.sleep(0.1)
+            print(f"Port cleared on {self.port}")
+            
+            self.set_baudrate(self.default_baudrate)
+            time.sleep(0.05)
+            print(f"Baudrate set to {self.default_baudrate} on {self.port}")
+            
+            if handshake:
                 self._handshake()
+            
         except (FileNotFoundError, OSError, serial.SerialException) as e:
             raise ConnectionError(
                 f"\nCould not connect on port '{self.port}'. Make sure you are using the correct port."
@@ -464,8 +475,11 @@ class MotorsBus(abc.ABC):
             self.port_handler.clearPort()
             self.port_handler.is_using = False
             self.disable_torque(num_retry=5)
-
-        self.port_handler.closePort()
+        
+        try:
+            self.port_handler.clearPort()
+        finally:
+            self.port_handler.closePort()
         logger.debug(f"{self.__class__.__name__} disconnected.")
 
     @classmethod
